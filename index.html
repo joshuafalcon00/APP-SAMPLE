@@ -179,8 +179,9 @@
   .pill-btn{
     display:inline-block; background: var(--accent); color: var(--accent-contrast);
     font-size: 12.5px; padding: 6px 12px; border-radius: 999px; text-decoration:none; flex-shrink:0;
+    border:none; cursor:pointer; font-family: -apple-system, sans-serif;
   }
-  .pill-btn.disabled{ background: var(--line); color: var(--muted); }
+  .pill-btn.disabled{ background: var(--line); color: var(--muted); cursor:not-allowed; }
   .icon-btn{
     background:none; border:none; cursor:pointer; color: var(--muted);
     font-size: 12.5px; padding: 4px; flex-shrink:0;
@@ -335,12 +336,54 @@
     });
   }
 
+  // Normalizes anything a user might paste (a bare username, an @handle,
+  // a m.me link, a messenger.com/t/ link, or a full facebook.com/fb.com
+  // profile link) into a canonical https://m.me/<id> link. Routing
+  // everything through m.me consistently is what lets openMessengerHref()
+  // below reliably force-launch the Messenger app instead of whatever
+  // app Android last used to handle a facebook.com link (often Facebook
+  // Lite, which also registers a handler for these links).
   function normalizeLink(input){
     input = (input || '').trim();
     if(!input) return '';
+    var fbMatch = input.match(/^https?:\/\/(www\.)?(m\.me|messenger\.com\/t|facebook\.com|fb\.com)\/([^/?#]+)/i);
+    if(fbMatch){
+      return 'https://m.me/' + fbMatch[3];
+    }
     if(/^https?:\/\//i.test(input)) return input;
     input = input.replace(/^@/, '').replace(/^m\.me\//i, '').replace(/^messenger\.com\/t\//i, '');
     return 'https://m.me/' + input;
+  }
+
+  // Opens a saved Messenger link so it actually lands in the Messenger
+  // app's DM thread instead of getting intercepted by Facebook Lite (which
+  // registers its own handler for m.me / facebook.com links on Android,
+  // and can end up as the OS's chosen default for them).
+  //
+  // On Android we route through an `intent://` URL with an explicit
+  // `package=com.facebook.orca` (Messenger's Android package name). That
+  // tells Android "open this with Messenger specifically," bypassing
+  // whatever app is currently set as default for these links entirely.
+  // If Messenger isn't installed, S.browser_fallback_url sends it to the
+  // normal https link instead. iOS doesn't have this ambiguity problem
+  // (m.me is a verified Universal Link straight to Messenger there), so
+  // we leave it as a plain link on iOS/desktop.
+  function openMessengerHref(link){
+    if(!link) return;
+    var isAndroid = /Android/i.test(navigator.userAgent || '');
+    if(isAndroid){
+      try{
+        var url = new URL(link);
+        var target = url.hostname + url.pathname + url.search;
+        var fallback = encodeURIComponent(link);
+        var intentUrl = 'intent://' + target +
+          '#Intent;package=com.facebook.orca;scheme=' + (url.protocol.replace(':','')) +
+          ';S.browser_fallback_url=' + fallback + ';end';
+        window.location.href = intentUrl;
+        return;
+      }catch(e){ /* fall through to plain link below */ }
+    }
+    window.open(link, '_blank', 'noopener');
   }
 
   function copyToClipboard(text){
@@ -517,7 +560,7 @@
             html += renderAvatar(person, 28);
             html += '<span class="contact-name">'+escapeHtml(person.name)+'</span>';
             if(person.link){
-              html += '<a class="pill-btn" href="'+escapeHtml(person.link)+'" target="_blank" rel="noopener">Open chat</a>';
+              html += '<button type="button" class="pill-btn" data-action="open-chat" data-link="'+escapeHtml(person.link)+'">Open chat</button>';
             } else {
               html += '<span class="pill-btn disabled">No link yet</span>';
             }
@@ -742,6 +785,10 @@
       }).catch(function(){
         showBanner("Couldn't copy automatically. Long-press the message box above to copy it manually.");
       });
+    }
+    else if(action === 'open-chat'){
+      var link = el.dataset.link;
+      openMessengerHref(link);
     }
     else if(action === 'remove-member'){
       var g2 = findGroup(id);
