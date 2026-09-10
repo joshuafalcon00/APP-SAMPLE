@@ -1,0 +1,16 @@
+{
+  "name": "Group Messages",
+  "short_name": "GroupMsg",
+  "description": "Save a message once per group, open each person's chat ready to paste and send, and check them off as you go.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8E3EC",
+  "theme_color": "#D6336C",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
